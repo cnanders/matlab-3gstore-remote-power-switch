@@ -12,8 +12,15 @@ classdef RemotePowerSwitch < handle
         cUser = 'admin';
         
         % {char 1xm} password for authentication with web request
-        cPass = 'MET5@lbl';
+        cPass = 'admin';
         
+        
+    end
+    
+    properties (Access = private)
+        
+        % {weboptions 1x1}
+        options
         
     end
     
@@ -73,12 +80,47 @@ classdef RemotePowerSwitch < handle
         % @param {uint8 1x1} outlet (1 or 2)
         function l = isOn(this, u8Outlet)
             
+            %{
+            The manufacturer's team got back to me about this. They say the
+            command you referred to is for “Control Outlet”. Therefore it
+            is slower, as it will ‘control the outlet, and then return
+            status”.
+
+            If you only need to check status, look under “Get Status”. The
+            command should be:
+
+            http://admin:admin@IP/xml/outlet_status.xml?
+
+            This response time is only around 0.005s.
+
+            %}
+            
+            %{
             cXml = webread(...
                 this.getUrl(), ...
                 'user', this.cUser, ...
                 'passwd', this.cPass, ...
                 'target', '/xml/outlet_status.xml' ...
             );
+            %}
+        
+            % Special URL that encodes HTTP basic auth username and
+            % password in the URL
+            
+           
+            
+             %{
+            cUrl = sprintf('http://%s:%s@%s/xml/outlet_status.xml?', ...
+                this.cUser, ...
+                this.cPass, ...
+                this.cHost ...
+            );             
+            cXml = webread(cUrl);
+             %}
+            
+            
+             cUrl = sprintf('http://%s/xml/outlet_status.xml?', this.cHost);
+             cXml = webread(cUrl, this.getWebOptions());
         
             [cMatch, ceTok] = regexp(cXml, ...
                 '<outlet_status>([0-9,]+)<\/outlet_status>', ...
@@ -111,6 +153,27 @@ classdef RemotePowerSwitch < handle
     end
     
     methods (Access = private)
+        
+        % Returns a weboptions object with HTTP Basic Auth credentials, 
+        % which is required by the rquest to
+        % http://IP/xml/outlet_status.xml
+        % @return {weboptions 1x1}
+        function options = getWebOptions(this)
+            
+            if ~isempty(this.options)
+                options = this.options;
+                return
+            end
+            
+            options = weboptions;
+            options.Username = this.cUser;
+            options.Password = this.cPass;
+            % options.ContentType = 'xml';
+            options.RequestMethod = 'Get';
+            
+            
+            
+        end
         
         function l = hasProp(this, c)
             
